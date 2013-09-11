@@ -1,0 +1,7 @@
+###### TODO LIST #######
+
+- Some cleanup of the code has to be done. There are useless comments here and there, and some weird syntax hanging around
+- Check the MPI IO issue -- Bad performance with multiple processes...
+- Drop in the code that allows compiling without --open64
+- Check for memory leaks (things not being deallocated correctly)
+

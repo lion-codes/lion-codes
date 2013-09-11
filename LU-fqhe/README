@@ -1,0 +1,90 @@
+03/07/2013 
+
+FQHE WF on GPU
+
+#### File structure / Workflow ####
+-- main.cpp
+
+-- FQHE.cpp/h
+Master program. 
+Initializes the MPI environment, then perform the following tasks:
+o Parse the command line
+o Discover the running environment
+o Gets information needed to run correctly the decomposition
+o Read the input file w/ MPI I/O
+o Allocate some memory for the results
+o Run the Monte Carlo Loop
+
+-- Node.cpp/h
+Contains information local to the node, as well as useful global information. It is made 
+of two objects:
+LocalInfo
+GlobalInfo
+
+-- LocalInfo.cpp/h
+Contains information local to the node. 
+Its constructor retrieves: the number of CPUs running on the node, the rank of the node, and the 
+GPU information of that node.
+The GPU information is stored in a GpuInfo object.
+
+-- GpuInfo.cpp/h
+Contains the information on the GPUs that are connected to the node. Gets the number of
+GPUs connected, and some GPU properties, such as:
+o the warp size
+o the max. number of threads per block
+o the max. number of threads in 1 dimension of the block
+o the max. number of blocks in 1 dimension of the grid
+o the max. global memory
+That information is stored in an array of SingleGPUInfo objects
+
+-- SingleGPUInfo.cpp/h
+See GpuInfo
+
+-- GlobalInfo.cpp/h
+Contains global information. For now it is only the number of nodes total.
+
+-- RunInfo.cpp/h
+Calculates some information about the number of matrices per block for the LU decomposition,
+the size of a matrix, the "load size" for the LU dec., the number of matrices/permutations,
+etc.
+That info is used at runtime for the CPU and GPU kernels.
+
+-- PermHandler.cpp/h
+Holder for the input file. Reads data from the input file, and stores it inside an
+appropriate array.
+Reads only a given chunk of the input file from the file system, using (for now) MPI IO.
+The offset for reading the chunk is based on the total number of nodes.
+
+-- MonteCarloLoop.cpp/h
+Wrapper for the MC loop. 
+o Performs the Monte Carlo Loop. First reads necessary info from the input objects, then calculates the work load balance between the GPUs and the CPUs.
+o It then allocates memory for each thread and GPU.
+o Launches an OpenMP parallel construct in which each assigned thread will allocate memory on one GPU
+o Iterates over the number of Monte Carlo iterations.
+o Inside the loop is an OpenMP parallel construct in which part of the CPU will queue work for the corresponding GPUs.
+o If the program has to work with a permutation file, the node # 0 will calculate Phi and Theta, then broadcast them to all nodes. Matrices are then constructed locally from these angles and input permutations.
+o Otherwise, the "permutations" are input file of matrices.
+
+-- LUCoreGPU.cpp/h
+Core of the program for the GPU. Calculate the determinant of all the determinants and product of them in luDeterminant.
+Perform a reduction of all the determinants in globalReduction.
+
+-- LUCoreCPU.cpp/h
+Performs the determinant calculation and sum on the CPUs.
+
+
+#### How to run the program #### 
+The program needs 6 arguments:
+o -N <Number of matrices / permutations>
+o -mc <Number of Monte Carlo iterations>
+o -f <path to permutation / matrix file>
+o -s <Side size of a matrix>
+o -Npb <Number of matrix per GPU block for the LU decomposition>
+o -mode LU/perm <Work with a matrix file or a permutation file>
+
+#### How to compile the program #### 
+See Makefile. 
+If there is too much output on the screen, change -D__VERBOSE__ to -U__VERBOSE__
+To enable error checking for the GPU, change -U__DEBUG__ to -D__DEBUG__, and change -O3 to -g and -g -G for icpc and nvcc respectively
+
+

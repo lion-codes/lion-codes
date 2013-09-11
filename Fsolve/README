@@ -1,0 +1,11 @@
+A non-linear solver for y in equation system F(k,y) = 0. After building, one may run thusly : 
+
+USAGE : fsolve.x <tolerance> <file with constant k data, comma separated> <soln. guess> & equations supplied on stdin
+
+eg.,
+
+./fsolve.x 0.01 ../inc/k_values_new.csv 0.00001 < ../inc/newer_equations.txt
+
+where tolerance is the sum of the equations solution squares (as the set of equations grows larger, may wish to be be more liberal with this parameter). The solution guess is cheap and dirty at this stage, simply a multiplier for rand(). Equations must be 1-based indexed, example files may be found in the inc directory. All the usual caveats related to Newton Raphson and GMRES apply here. For instance, if you find the L2 norm growing unbounded, best to restart with/without a new initial guess. The software will also do it's best to account for missing/bad indices in the input equations (and will tell you if this happens), although obviously if the Jacobian is singular, the solve will fail (and abort). Finally, if the method doesn't converge fairly rapidly, assume a bad initial guess, or you may wish to experiment with the preconditioners available in CUSP.
+
+WJB/PYT 0813 

@@ -1,0 +1,60 @@
+NVCC = nvcc
+CXX = icpc 
+NVCCFLAGS = -arch sm_20  -D__VERBOSE__ -D__PADDED__ -Xcompiler -fopenmp -D WRITE_DET -D PERFORM_PROD
+CXXFLAGS =-openmp -D__VERBOSE__ -D__PADDED__ 
+EXEC=fqhe.x
+
+MPI_ROOT=/usr/global/openmpi/1.4.3/intel
+MPI_INC=$(MPI_ROOT)/include
+MPI_LIB=$(MPI_ROOT)/lib
+
+CUDA_ROOT=/usr/global/cuda/5.0
+CUDA_INC=$(CUDA_ROOT)/include
+CUDA_LIB=$(CUDA_ROOT)/lib64
+
+LINK = -L$(MPI_LIB) -lmpi -L$(CUDA_LIB) -lcuda -lcudart  
+INC  = -I inc/ -I$(MPI_INC) -I $(CUDA_INC)
+
+SOURCES     := $(sort $(wildcard src/*.cpp src/*.cu ))
+OBJECTS     := $(sort $(patsubst src/%, obj/%.o, $(SOURCES)))
+
+## Create the directory in which the current target resides in
+DIR_GUARD = @mkdir -p $(@D)
+
+## Rules
+# Release by default
+all: release 
+
+# Undefine DEBUG symbol, add O3 and xHost
+release: NVCCFLAGS += -U__DEBUG__ -O3 --ptxas-options=-v
+release: CXXFLAGS  += -U__DEBUG__ -O3 -xHost
+release: $(EXEC) 
+	@echo "Release version"
+
+# Define DEBUG symbol, add -g -G
+debug: NVCCFLAGS += -D__DEBUG__ -g -G --ptxas-options=-v
+debug: CXXFLAGS  += -D__DEBUG__ -g 
+debug: $(EXEC) 
+	@echo "Debug version"
+
+# Define CPU Only
+cpuonly: NVCCFLAGS += -U__DEBUG__ -O3 --ptxas-options=-v -D__NOGPU__
+cpuonly: CXXFLAGS  += -U__DEBUG__ -O3 -xHost -D__NOGPU__
+cpuonly: $(EXEC) 
+	@echo "CPU Only version"
+
+$(EXEC): $(OBJECTS)
+	mkdir -p bin
+	mpic++ -openmp -o bin/$(EXEC) $^ $(LINK) $(INC)
+
+obj/%.cu.o: src/%.cu
+	$(DIR_GUARD)
+	$(NVCC) -o $@ -c $< $(INC) $(NVCCFLAGS) 
+
+obj/%.cpp.o: src/%.cpp
+	$(DIR_GUARD)
+	$(CXX) -o $@ -c $< $(INC) $(CXXFLAGS)
+
+clean:
+	rm -rf obj/*
+	rm -rf bin/fqhe.x
