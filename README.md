@@ -35,4 +35,4 @@ A GPU implementation of the geometric transform, for use with computed tomograph
 
 RNG
 ---
-A cheap RNG based around the unpredictability of the scheduler; distribution is heavily skewed toward [0,1] bounds
+A cheap RNG based on the unpredictability of the scheduler; distribution is heavily skewed toward [0,1] bounds
