@@ -11,8 +11,7 @@ Contributor : A. Khodayari
 
 Integration
 -----------
-Performs a simple composite trapezoidal or Simpsons 1D integration of a data set, approximately three times more performant than similar routines executed on a single CPU socket (recent Intel device). (TODO: Simpsons).
-
+Performs a simple composite trapezoidal or Simpsons 1D integration of a data set, approximately three times more performant than similar routines executed on a single CPU socket (recent Intel device). 
 Lanczos
 -------
 A GPU version of the eigen-decomposition method for Hermitian matrices. Here, the matrix to be diagonalized is partitioned among GPUs, which essentially perform BLAS operations. The output tridiagonal matrix is diagonalized on the root MPI process using the tridiagonal QR algorithm, and eigenvectors may be constructed in the space of the original input (Hermitian) matrix. Designed for use with condensed matter applications. (TODO: sparse matrices, restart option to save space)
