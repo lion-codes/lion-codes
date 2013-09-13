@@ -1,0 +1,18 @@
+CPU/GPU lanczos diagonalization w/ tridiagonal QR algorithm. Setup and do a test run on lion-GA (uses a CUDA-enabled build of openmpi):
+
+> module load cuda/5.0
+> module load mkl
+> export LD_LIBRARY_PATH=/usr/global/openmpi/022513/gnu/lib/:$LD_LIBRARY_PATH
+> export PATH=/usr/global/openmpi/022513/gnu/bin/:$PATH
+> make
+> cd bin
+> mpirun -np 1 ./lan.x 16 16 ../inc/test_lan_16X16.bin
+
+
+note that the *m and *mat files for checking eig() are written for octave. You can switch btwn CPU and GPU accelerated builds by setting this define in main.h: #define _USE_GPU
+
+KNOWN ISSUES 0913:
+-communication bug however single CPU/GPU results should agree
+-bug related to convergence in final QR tridiagonal call
+
+-WJB/PYT 0913
