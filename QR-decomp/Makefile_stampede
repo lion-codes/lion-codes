@@ -1,0 +1,56 @@
+# Makefile layout originally developed by Bill Lynch
+SOURCES     := $(sort $(wildcard src/*.cpp src/*.cu src/*.cc src/*.c))
+OBJECTS     := $(sort $(patsubst src/%, obj/%.o, $(SOURCES)))
+DEPENDS     := $(sort $(patsubst src/%, obj/%.d, $(SOURCES)))
+
+INCLUDES += -I./inc
+INCLUDES += -I/opt/apps/cuda/5.0/include
+INCLUDES += -I/opt/apps/intel/13/composer_xe_2013.0.079/mkl/include/
+
+LIB	+= -L/opt/apps/cuda/5.0/lib64
+LIB	+= -L/opt/apps/intel/13/composer_xe_2013.0.079/mkl/lib/intel64
+
+CFLAGS      += -std=gnu99 -openmp $(INCLUDES) 
+LDFLAGS     += $(LIB) -lcudart -lcuda -lcublas 
+LDFLAGS     += -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lpthread -openmp 
+CUFLAGS     += -arch=sm_30 -I./inc 
+CUFLAGS     += --ptxas-options=-v 
+
+NVCC        := nvcc -O3
+CXX         := icc -O3 -xHost
+
+bin/qr.x: $(OBJECTS)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
+clean:
+	rm -rf bin obj
+
+obj/%.cpp.o: src/%.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+obj/%.cc.o: src/%.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+obj/%.cu.o: src/%.cu
+	$(NVCC) $(CPPFLAGS) $(CUFLAGS) -c $< -o $@
+
+obj/%.c.o: src/%.c
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+obj/%.cpp.d: src/%.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MM -MT "$(strip $(patsubst %.d, %.o, $@) $@)" $< -o $@
+
+obj/%.cc.d: src/%.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MM -MT "$(strip $(patsubst %.d, %.o, $@) $@)" $< -o $@
+
+obj/%.cu.d: src/%.cu
+	$(NVCC) $(CPPFLAGS) $(CUFLAGS) -M $< | sed -e '1 s:$*.o:obj/$*.cu.d obj/$*.cu.o:' -e 's:[^ ]*/ ::g' > $@ 
+
+obj/%.c.d: src/%.c
+	$(CXX) $(CPPFLAGS)  $(CFLAGS) -MM -MT "$(strip $(patsubst %.d, %.o, $@) $@)" $< -o $@
+
+# Create system layout for Objects and binaries
+ifneq ($(MAKECMDGOALS),clean)
+$(shell mkdir -p bin obj)
+-include $(DEPENDS)
+endif

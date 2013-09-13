@@ -1,0 +1,20 @@
+QR Decomposition
+
+o Performs the in-place QR decomposition of a batch of matrices, using Givens rotations.
+
+o Three approaches are considered and are included in the different files "giv_qr_*"
+- Giv_qr_bat: . The Givens rotations are accumulated through a GEMM routine from CUBLAS.
+- Giv_qr_mmpbl: functions the same way as giv_qr_bat, but each CUDA Block now deals with multiple matrices, thus improving the occupancy for small matrices
+- Giv_qr_kuck: performs the QR decomposition with multiple independent Givens rotations being applied to the matrix at the same time.
+
+o Timers are included to measure the performance against MKL
+
+o To build on lion-GA:
+> module load cuda/5.0
+> module load mkl
+> make
+
+o A makefile is also provided to build on Stampede. To build on Stampede:
+> module load cuda/5.0
+> module spider mkl
+> make -f Makefile_stampede
