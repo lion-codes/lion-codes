@@ -29,10 +29,10 @@ QR-decomp
 ---------
 Several GPU algorithms using variations on the Givens rotation based approach, with performance exceeding MKL in specific instances.
 
-Radon
------
-A GPU implementation of the geometric transform, for use with computed tomography applications, but potentially also useful in filtering and noise reduction.  (TODO: inverse Radon).
 
 RNG
 ---
 A cheap RNG based on the unpredictability of the scheduler; distribution is heavily skewed toward [0,1] bounds
+
+
+WJB + PYT 09/13
