@@ -13,6 +13,6 @@ note that the *m and *mat files for checking eig() are written for octave. You c
 
 KNOWN ISSUES 0913:
 -communication bug however single CPU/GPU results should agree
--bug related to convergence in final QR tridiagonal call
+-bug related to convergence in final tridiagonal QR call
 
 -WJB/PYT 0913
