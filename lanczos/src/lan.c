@@ -381,6 +381,9 @@ void lanczos(complex double * A, 	// chunk of A
 #endif
 		// need to gather into r
 		int success = MPI_Allgather((void*) d_r, myRows, MPI_LONG_DOUBLE, (void*) d_r, myRows, MPI_LONG_DOUBLE,MPI_COMM_WORLD);
+
+
+
 #ifdef _DEBUG_LANCZOS
 		if (success != MPI_SUCCESS) {
 

@@ -22,11 +22,12 @@
 #include <stdio.h>
 #include "lan.h"
 
-__device__ void reduce(volatile cuDoubleComplex * scratch){
+__device__ void reduce(volatile cuDoubleComplex * scratch, int size){
+
 
 
 #if _DOT_THREADS == 1024
-	if (threadIdx.x < 512){ 
+	if ((threadIdx.x < 512) && (size ==1024)){ 
 		// unsupported	by compiler
 		//scratch [ threadIdx.x ] 	= cuCadd(scratch [ threadIdx.x ] , scratch [ threadIdx.x + 512] );
 		scratch [ threadIdx.x ].x 	+= scratch [ threadIdx.x + 512].x;
@@ -37,7 +38,7 @@ __device__ void reduce(volatile cuDoubleComplex * scratch){
 
 
 #if _DOT_THREADS >= 512
-	if (threadIdx.x < 256){ 	
+	if ((threadIdx.x < 256) && (size>=512)){ 	
 		scratch [ threadIdx.x ].x 	+= scratch [ threadIdx.x + 256].x;
 		scratch [ threadIdx.x ].y 	+= scratch [ threadIdx.x + 256].y;
 	}
@@ -46,7 +47,7 @@ __device__ void reduce(volatile cuDoubleComplex * scratch){
 
 
 #if _DOT_THREADS >= 256
-	if (threadIdx.x < 128){ 	
+	if ((threadIdx.x < 128) && (size>=256)){ 	
 		scratch [ threadIdx.x ].x 	+= scratch [ threadIdx.x + 128].x;
 		scratch [ threadIdx.x ].y 	+= scratch [ threadIdx.x + 128].y;
 	}
@@ -55,7 +56,7 @@ __device__ void reduce(volatile cuDoubleComplex * scratch){
 
 
 #if _DOT_THREADS >= 128
-	if (threadIdx.x < 64){ 	
+	if ((threadIdx.x < 64) && (size>=128)){ 	
 		scratch [ threadIdx.x ].x 	+= scratch [ threadIdx.x + 64].x;
 		scratch [ threadIdx.x ].y 	+= scratch [ threadIdx.x + 64].y;
 	}
@@ -64,7 +65,7 @@ __device__ void reduce(volatile cuDoubleComplex * scratch){
 
 
 #if _DOT_THREADS >= 64
-	if (threadIdx.x < 32){ 	
+	if ((threadIdx.x < 32) && (size>=64)){ 	
 		scratch [ threadIdx.x ].x 	+= scratch [ threadIdx.x + 32].x;
 		scratch [ threadIdx.x ].y 	+= scratch [ threadIdx.x + 32].y;
 	}
@@ -72,7 +73,7 @@ __device__ void reduce(volatile cuDoubleComplex * scratch){
 
 
 #if _DOT_THREADS >= 32
-	if (threadIdx.x < 16){ 	
+	if ((threadIdx.x < 16) && (size>=32)){ 	
 		scratch [ threadIdx.x ].x 	+= scratch [ threadIdx.x + 16].x;
 		scratch [ threadIdx.x ].y 	+= scratch [ threadIdx.x + 16].y;
 	}
@@ -96,6 +97,7 @@ __device__ void reduce(volatile cuDoubleComplex * scratch){
 	if (threadIdx.x < 1){ 	
 		scratch [ threadIdx.x ].x 	+= scratch [ threadIdx.x + 1].x;
 		scratch [ threadIdx.x ].y 	+= scratch [ threadIdx.x + 1].y;
+
 	}
 
 
@@ -119,7 +121,7 @@ __global__ void vector_dot_single(cuDoubleComplex * inputA,
 
 	int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-	if (j>size) return;
+	if (j>=size) return;
 
 
 
@@ -136,7 +138,7 @@ __global__ void vector_dot_single(cuDoubleComplex * inputA,
 
 	__syncthreads();
 
-	reduce(scratch);
+	reduce(scratch,size);
 
 	__syncthreads();
 	if (threadIdx.x == 0) { 
@@ -150,6 +152,7 @@ __global__ void vector_dot_single(cuDoubleComplex * inputA,
 			tmpA.y = scratch[0].y;
 
 		}
+
 		result[threadIdx.x].x 	= tmpA.x; 
 		result[threadIdx.x].y 	= tmpA.y; 
 	} 
@@ -178,7 +181,7 @@ __global__ void vector_dot(cuDoubleComplex * inputA,
 
 	int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-	if (j>size) return;
+	if (j>=size) return;
 
 	// 
 	if (!final){
@@ -189,6 +192,7 @@ __global__ void vector_dot(cuDoubleComplex * inputA,
 		tmpA.y = (type) ? -inputA [j+offsetA].y : inputA [j+offsetA].y;
 		tmpB.x = inputB [j].x;
 		tmpB.y = inputB [j].y;
+
 
 		scratch [ threadIdx.x ].x = tmpA.x*tmpB.x-tmpA.y*tmpB.y;
 		scratch [ threadIdx.x ].y = tmpA.y*tmpB.x+tmpA.x*tmpB.y;
@@ -201,7 +205,7 @@ __global__ void vector_dot(cuDoubleComplex * inputA,
 	__syncthreads();
 
 
-	reduce(scratch);
+	reduce(scratch,size);
 
 	__syncthreads();
 	if ((threadIdx.x == 0) && !(final)) {  
