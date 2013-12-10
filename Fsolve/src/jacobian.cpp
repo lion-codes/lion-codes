@@ -100,7 +100,7 @@ void jacobian(vector<float>& k_inds, 			//input: the k indices for equations
 				// if y appeared in this map, we have a non-zero contribution to the jacobian term
 				if (found){
 					jac_terms++;
-					if (pow = 1.0f)
+					if (pow == 1.0f)
 						constants_jac.push_back(constants[index]);
 					else
 
