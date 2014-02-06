@@ -230,6 +230,7 @@ void __global__ lanczos_first_update(cuDoubleComplex * d_r,
 
 	__shared__ cuDoubleComplex beta;
 
+	printf("%i %i\n",threadIdx.x,blockIdx.x);
 
 	int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -388,6 +389,7 @@ cudaError_t lanczos_first_update(dim3 blocks,
 
 
 	cudaGetLastError();
+	printf("Im here\n");
 	lanczos_first_update<<<blocks,threads>>>(d_r,d_Q,d_beta,m,i);
 
 	return cudaGetLastError();

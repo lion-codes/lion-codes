@@ -18,6 +18,17 @@
 
 #include "main.h"
 
+void lanczos(complex double * A, 	// chunk of A
+		complex double * evecs, //the eigenvectors
+		double * evals,		//evals, real
+		int n, 			// full size of A
+		int m,			// rows of A for this process
+		int myOffset,			// where to begin			
+		int subSize,			// the subspace size
+		int commSize,			// MPI size
+		int commRank);			// MPI rank
+
+
 // a harness for testing lanczos
 
 int main(int argc, char * argv[] ){
@@ -57,35 +68,20 @@ int main(int argc, char * argv[] ){
 
 	complex double * A = (complex double *) malloc(sizeof(complex double) * myRows * matSize);
 
+	MPI_File in;
 
-
-	FILE * fptr = fopen ( argv[3], "r" );
-
-	if (fptr==NULL){
-		fprintf(stderr,"failed to open file %s\n",argv[3]);
+	int ierr = MPI_File_open(MPI_COMM_WORLD, argv[3], MPI_MODE_RDONLY, MPI_INFO_NULL, &in);
+	if (ierr) {
+		if (commRank == 0) fprintf(stderr, "%s: Couldn't open file %s\n", argv[0], argv[3]);
+		MPI_Finalize();
 		exit(1);
 	}
 
-	int err = fseek(fptr,sizeof(complex double)*myOffset*matSize,SEEK_SET);
-
-	if (err){
-
-		fprintf(stderr,"failed to seek in file %s; bad file/ matrix size ??\n",argv[3]);
-		exit(1);
-
-	}
-
-	err = fread(A,sizeof(complex double),myRows*matSize,fptr);
-	fclose(fptr);
-
-	if (!err){
-
-		fprintf(stderr,"failed to read file %s; bad file/ matrix size ??\n",argv[3]);
-		exit(1);
-
-	}
+	MPI_File_read_at_all(in, myOffset*matSize*2*sizeof(MPI_DOUBLE), A, myRows*matSize*2, MPI_DOUBLE, MPI_STATUS_IGNORE);
 
 
+	MPI_File_close(&in);
+#if 0
 #ifdef _DEBUG_LANCZOS
 	// dump out
 
@@ -95,7 +91,7 @@ int main(int argc, char * argv[] ){
 	for (int i=0; i<myRows; i++){
 
 		for (int j=0; j<matSize; j++)
-			fprintf(stderr,"%i,%i %f+%fi ",i+myOffset, j,creal(A[i+j*myRows]),cimag(A[i+j*myRows]));
+			fprintf(stderr,"%i,%i,%i %f+%fi ",commRank,i+myOffset, j,creal(A[i+j*myRows]),cimag(A[i+j*myRows]));
 
 		fprintf(stderr,"\n");
 	}
@@ -104,9 +100,14 @@ int main(int argc, char * argv[] ){
 
 	fprintf(stderr,"myOffset : %i matSize : %i myRows : %i commRank : %i\n",myOffset,matSize,myRows,commRank);
 #endif
-	lanczos(A, matSize, myRows, myOffset, subSize, commSize, commRank);
+#endif
+	
+	complex double * evecs	= (complex double*) malloc(sizeof(complex double) * matSize * subSize);
+	double * evals	= (double*) malloc(sizeof(double) * subSize);
 
-	free(A);
+	lanczos(A, evecs, evals, matSize, myRows, myOffset, subSize, commSize, commRank);
+
+	free(A); free(evecs); free(evals);
 	MPI_Finalize();
 
 
