@@ -26,7 +26,7 @@
 
 #define _DEBUG_LANCZOS
 #define _MAX_SIZE 1024*1024
-#define _USE_GPU
+//#define _USE_GPU
 #define _CALC_EVECS
 
 //#define _GATHER_SCALAR
@@ -56,17 +56,6 @@
 #define check_cu_error(x) 	
 #define	check_cb_error(x)	
 #endif
-
-
-#define dump_vec(rnk,y,x) printf(y); \
-	printf("%i :\n",rnk); for (int i=0; i<n; i++) \
-	printf("%f+i%f ",creal(x[i]),cimag(x[i])); printf("\n");
-
-//dump column major, full matrix
-#define dump_mat(y,x) printf(y); \
-	printf(":\n"); for (int i=0; i<n; i++){ \
-	for (int j=0; j<n; j++) printf("%f + %fi ",creal(x[j*n+i]),cimag(x[j*n+i])); printf("\n");}
-
 
 
 // blas& lapack defs
@@ -143,7 +132,8 @@ cudaError_t lanczos_second_update(dim3 blocks,
 		cuDoubleComplex * d_Q, 
 		cuDoubleComplex * d_beta, 
 		int m,
-		int i);
+		int i,
+		int j);
 
 cudaError_t lanczos_third_update(dim3 blocks,
 		dim3 threads,

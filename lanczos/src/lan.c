@@ -53,6 +53,42 @@ void check_last_cublas_error(cublasStatus_t status, char * msg, char * hostname,
 
 #endif
 
+void lanczos_diagnostic_c(complex double * r,
+		complex double * Q,
+		complex double * beta,
+		complex double * alpha,
+		int m,
+		int i){
+
+
+
+	printf("-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n");
+	printf("Q: \n");
+	for (int j=0; j<=i; j++){
+		for (int k=0; k<m; k++){
+			printf("%f+%fi ",creal(Q[j*m+k]),cimag(Q[j*m+k]));
+		}
+		printf("\n");
+	}
+
+	printf("r: \n");
+	for (int k=0; k<m; k++)
+		printf("%f+%fi ",creal(r[k]),cimag(r[k]));
+	printf("\n");
+
+
+	printf("a: \n");
+	for (int k=0; k<m; k++)
+		printf("%f+%fi ",creal(alpha[k]),cimag(alpha[k]));
+
+	printf("\n");
+	printf("b: \n");
+	for (int k=0; k<m-1; k++)
+		printf("%f+%fi ",creal(beta[k]),cimag(beta[k]));
+	printf("\n");
+
+}
+
 
 void lanczos(complex double * A, 	// chunk of A
 		complex double * evecs, //the eigenvectors
@@ -116,7 +152,7 @@ void lanczos(complex double * A, 	// chunk of A
 	cublasStatus_t status = cublasInit();
 	check_cu_error("CUBLAS initialization error on host");
 
-	cuDoubleComplex d_ortho;
+	cuDoubleComplex * d_ortho;
 	cuDoubleComplex * d_r;
 	cuDoubleComplex * d_A;
 	cuDoubleComplex * d_Q;
@@ -151,9 +187,8 @@ void lanczos(complex double * A, 	// chunk of A
 	threads.x 	= _LAN_THREADS;
 	blocks.x 	= n / threads.x +1;
 
-	threads.y,threads.z,blocks.y,blocks.z	= 1;
+	threads.y=1,threads.z=1,blocks.y=1,blocks.z	= 1;
 
-		printf("blocks: %i threads: %i\n",blocks.x,threads.x);
 #endif
 
 	// multiplicative factors in gemv
@@ -199,9 +234,6 @@ void lanczos(complex double * A, 	// chunk of A
 	for (int i=0; i<n; i++) beta[0]		+= conj(r[i]) * r[i];	
 	beta[0] = sqrt(beta[0]);
 
-
-	//dump_vec(commRank,"alpha",alpha);
-
 	//test subsequent lanczos vectors
 	double ortho;
 
@@ -235,10 +267,13 @@ void lanczos(complex double * A, 	// chunk of A
 
 
 		// new column to Q, updated q
+		
 		for (int j=0; j<n; j++) Q[i*n+j] = r[j] / beta[i-1];
 
 		// update r 
 		zgemv_(&type,&m,&n,&mula,A,&m,&Q[i*n],&inc,&mulb,&r[myOffset],&inc);
+
+		lanczos_diagnostic_c(r,Q,beta,alpha,n,i);
 
 #ifndef _GATHER_SCALAR
 		// need to gather into r
@@ -261,8 +296,12 @@ void lanczos(complex double * A, 	// chunk of A
 #endif
 
 #endif
+		//
+		int ind = (commSize==1) ? i-1 : i;
+
 		// another r update
-		for (int j=0; j<n; j++) r[j] 	-= beta[i] * Q[(i-1)*n+j];
+		for (int j=0; j<n; j++) r[j] 	-= beta[ind] * Q[(i-1)*n+j];
+
 
 #ifndef _GATHER_SCALAR
 		// update alpha
@@ -288,9 +327,10 @@ void lanczos(complex double * A, 	// chunk of A
 
 
 
+		//exit(0);
 		// re-orthogonalize
 		// r -= Q(Q^T * r)
-		if (fabs(ortho) > _EVECS_NORM){
+		if ( ortho > _EVECS_NORM){
 
 #ifdef _GATHER_SCALAR
 			// need to gather into r
@@ -346,32 +386,21 @@ void lanczos(complex double * A, 	// chunk of A
 
 #else
 
+		//lanczos_diagnostic(blocks,threads,d_r,d_Q,d_beta,d_alpha,n,i);
 		cerror = lanczos_first_update(blocks, threads, d_r, d_Q, d_beta, n, i);
 		check_cu_error("lanczos_first_update failed on host");
 
+		//exit(0);
 		cublasGetError();
 
 
-		cublasZgemv(handle,CUBLAS_OP_N,m,n,&mula,d_A,m,&d_Q[i*m],1,&mulb,&d_r[myOffset],1);
+		cublasZgemv(handle,CUBLAS_OP_N,m,n,&mula,d_A,m,&d_Q[i*n],1,&mulb,&d_r[myOffset],1);
 
 		status = cublasGetError();
 		check_cb_error("cublasZgemv failed on host");
 
-#if 0
-		{
-			int i = 0;
-			char hostname[256];
-			gethostname(hostname, sizeof(hostname));
-			printf("PID %d on %s ready for attach\n", getpid(), hostname);
-			fflush(stdout);
-			while (0 == i)
-				sleep(5);
-		}
-
-#endif
 		// need to gather into r
 		int success = MPI_Allgather((void*) &d_r[myOffset], m, MPI_LONG_DOUBLE, (void*) d_r, m, MPI_LONG_DOUBLE,MPI_COMM_WORLD);
-
 
 
 #ifdef _DEBUG_LANCZOS
@@ -388,8 +417,11 @@ void lanczos(complex double * A, 	// chunk of A
 
 #endif
 
-		cerror = lanczos_second_update(blocks, threads, d_r, d_Q, d_beta, n, i);
+
+		int ind = i; //(commSize==1) ? i-1 : i;
+		cerror = lanczos_second_update(blocks, threads, d_r, d_Q, d_beta, n, i, ind);
 		check_cu_error("lanczos_second_update failed on host");
+
 		cerror = vector_dot(d_Q,d_r,d_output,&d_alpha[i],1,n,i*n,0,0);
 		check_cu_error("vector_dot failed on host");
 
@@ -403,31 +435,35 @@ void lanczos(complex double * A, 	// chunk of A
 		check_cu_error("vector_dot failed on host");
 
 
+
 		// crude orthogonality test
 		//
-		if (1){
-			cerror = vector_dot(d_Q,d_Q,d_output,&d_ortho,1,n,(i-1)*m,i*m,0);
-			check_cu_error("vector_dot failed on host");
+		cerror = vector_dot(d_Q,d_Q,d_output,d_ortho,1,n,0,i*n,1);
+		check_cu_error("vector_dot failed on host");
 
-			cudaMemcpy(&ortho,&d_ortho,sizeof(complex double), cudaMemcpyDeviceToHost);
+		//lanczos_diagnostic(blocks,threads,d_r,d_Q,d_beta,d_alpha,n,i);
 
-			if (fabs(ortho) > _EVECS_NORM){
-
-
-				cublasGetError();
-
-				cublasZgemv(handle,CUBLAS_OP_T,n,subSize,&mula,d_Q,dim,d_r,1,&mulb,d_output,1);
-				cublasZgemv(handle,CUBLAS_OP_N,n,subSize,&mula,d_Q,dim,d_output,1,&mulb,d_output,1);
-
-				status = cublasGetError();
-				check_cb_error("cublasZgemv failed on host");
-
-				cerror = lanczos_fourth_update(blocks, threads, d_r, d_output, n);
-				check_cu_error("lanczos_fourth_update failed on host");
-			}
+		cudaMemcpy(&ortho,&d_ortho,sizeof(double), cudaMemcpyDeviceToHost);
 
 
+		if (fabs(ortho) > _EVECS_NORM){
+			//if (0){
+
+
+			cublasGetError();
+
+			cublasZgemv(handle,CUBLAS_OP_T,n,subSize,&mula,d_Q,dim,d_r,1,&mulb,d_output,1);
+			cublasZgemv(handle,CUBLAS_OP_N,n,subSize,&mula,d_Q,dim,d_output,1,&mulb,d_output,1);
+
+			status = cublasGetError();
+			check_cb_error("cublasZgemv failed on host");
+
+			cerror = lanczos_fourth_update(blocks, threads, d_r, d_output, n);
+			check_cu_error("lanczos_fourth_update failed on host");
 		}
+
+
+
 #endif
 		}
 
@@ -452,17 +488,18 @@ void lanczos(complex double * A, 	// chunk of A
 
 #endif
 
-#ifdef _DEBUG_LANCZOS
-if (commRank==0){
 
-		printf("alpha & beta :\n");
-		for (int i=0; i<subSize; i++)
-			printf("%f+%fi ",creal(alpha[i]),cimag(alpha[i]));
-		printf("\n");
-		for (int i=0; i<subSize-1; i++)
-			printf("%f+%fi ",creal(beta[i]),cimag(beta[i]));
-		printf("\n");
-}
+#ifdef _DEBUG_LANCZOS
+		if (commRank==0){
+
+			printf("alpha & beta :\n");
+			for (int i=0; i<subSize; i++)
+				printf("%f+%fi ",creal(alpha[i]),cimag(alpha[i]));
+			printf("\n");
+			for (int i=0; i<subSize-1; i++)
+				printf("%f+%fi ",creal(beta[i]),cimag(beta[i]));
+			printf("\n");
+		}
 #endif
 		// calculate spectrum of (now) tridiagonal matrix
 
@@ -497,21 +534,23 @@ if (commRank==0){
 		for (int i=0; i<subSize; i++) evals[i] = alp[i];
 
 #ifdef _DEBUG_LANCZOS
-		
-if (commRank==0){
-		printf("evals :\n");
 
-		for (int i=0; i<subSize; i++)
-			printf("%f ",evals[i]);
-		printf("\n");
+		if (commRank==0){
+			printf("evals :\n");
 
-}
+			for (int i=0; i<subSize; i++)
+				printf("%f ",evals[i]);
+			printf("\n");
+
+		}
 #endif
 
 
 		free(alp); 
 		free(alpha); 	
 		free(beta);
+#ifndef _USE_GPU
 		free(r);
+#endif
 		free(Q);
-	}
+		}

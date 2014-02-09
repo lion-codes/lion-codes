@@ -100,8 +100,7 @@ int main(int argc, char * argv[] ){
 
 	fprintf(stderr,"myOffset : %i matSize : %i myRows : %i commRank : %i\n",myOffset,matSize,myRows,commRank);
 #endif
-#endif
-	
+#endif	
 	complex double * evecs	= (complex double*) malloc(sizeof(complex double) * matSize * subSize);
 	double * evals	= (double*) malloc(sizeof(double) * subSize);
 

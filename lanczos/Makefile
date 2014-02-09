@@ -4,7 +4,8 @@ OBJECTS     := $(sort $(patsubst src/%, obj/%.o, $(SOURCES)))
 DEPENDS     := $(sort $(patsubst src/%, obj/%.d, $(SOURCES)))
 
 CFLAGS      += -std=gnu99 -I./inc -I/usr/global/cuda/5.0/include 
-LDFLAGS     += -L/usr/global/cuda/5.0/lib64 -lcudart -lcuda -lcublas -lmpi 
+#LDFLAGS     += -L/usr/global/cuda/5.0/lib64 
+LDFLAGS	    += -L/usr/local/cuda-5.5/lib64 -lcudart -lcuda -lcublas -lmpi 
 LDFLAGS     += -L/usr/global/intel/mkl/11.0.0.079/lib/intel64/ -lmkl_rt -lm -fopenmp
 CUFLAGS     += -arch=sm_20 -I./inc -I/usr/global/openmpi/022513/gnu/lib
 CUFLAGS     += --ptxas-options=-v

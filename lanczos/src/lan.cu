@@ -153,6 +153,7 @@ __global__ void vector_dot_single(cuDoubleComplex * inputA,
 
 		}
 
+
 		result[threadIdx.x].x 	= tmpA.x; 
 		result[threadIdx.x].y 	= tmpA.y; 
 	} 
@@ -230,7 +231,7 @@ void __global__ lanczos_first_update(cuDoubleComplex * d_r,
 
 	__shared__ cuDoubleComplex beta;
 
-	printf("%i %i\n",threadIdx.x,blockIdx.x);
+	//printf("%i %i\n",threadIdx.x,blockIdx.x);
 
 	int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -245,14 +246,15 @@ void __global__ lanczos_second_update(cuDoubleComplex * d_r,
 		cuDoubleComplex * d_Q,
 		cuDoubleComplex * d_beta,
 		int m,
-		int i){
+		int i,
+		int ii){
 
 	__shared__ cuDoubleComplex beta;
 
 	int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 	if (j >= m) return;
-	if (threadIdx.x==0) beta = d_beta[i];
+	if (threadIdx.x==0) beta = d_beta[ii-1];
 	__syncthreads();
 	d_r[j] 	= cuCsub(d_r[j],cuCmul(beta,d_Q[(i-1)*m+j]));
 
@@ -289,15 +291,15 @@ void __global__ lanczos_fourth_update(cuDoubleComplex * d_r,
 
 extern "C"{
 
-cudaError_t vector_dot(cuDoubleComplex * inputA,
-		cuDoubleComplex * inputB,
-		cuDoubleComplex * output,
-		cuDoubleComplex * result,
-		int type,
-		int size,
-		int offsetA,
-		int offsetB,
-		int sqr){
+cudaError_t vector_dot(cuDoubleComplex * inputA,	//left vector
+		cuDoubleComplex * inputB,		//right vector
+		cuDoubleComplex * output,		//tmp storage for process
+		cuDoubleComplex * result,		//ultimate result
+		int type,				//complex conj (==1) or not			
+		int size,				//
+		int offsetA,				//offset into A
+		int offsetB,				//
+		int sqr){				//take the sqrt (==1) or not
 
 
 	dim3 blocks,threads;
@@ -310,7 +312,7 @@ cudaError_t vector_dot(cuDoubleComplex * inputA,
 	// FIXME : greater sizes
 	if (blocks.x ==1){
 		vector_dot_single<<<blocks,threads>>>(inputA, inputB, result, type, size,offsetA,offsetB,sqr);
-	}
+		}
 	else if ((blocks.x < _DOT_THREADS) && (blocks.x > 1)){
 		vector_dot<<<blocks,threads>>>(inputA, inputB, output,result, type, size,0,offsetA,offsetB,sqr);
 		int newSize 	= blocks.x;
@@ -370,10 +372,11 @@ cudaError_t lanczos_second_update(dim3 blocks,
 		cuDoubleComplex * d_Q,
 		cuDoubleComplex * d_beta,
 		int m,
-		int i){
+		int i,
+		int j){
 
 	cudaGetLastError();
-	lanczos_second_update<<<blocks,threads>>>(d_r,d_Q,d_beta,m,i);
+	lanczos_second_update<<<blocks,threads>>>(d_r,d_Q,d_beta,m,i,j);
 
 	return cudaGetLastError();
 }
@@ -389,11 +392,30 @@ cudaError_t lanczos_first_update(dim3 blocks,
 
 
 	cudaGetLastError();
-	printf("Im here\n");
 	lanczos_first_update<<<blocks,threads>>>(d_r,d_Q,d_beta,m,i);
 
 	return cudaGetLastError();
 }
+
+cudaError_t dump_mat(cuDoubleComplex * mat,
+		int rows,
+		int cols){
+
+
+	cuDoubleComplex * mat_tmp = (cuDoubleComplex*) malloc(sizeof(cuDoubleComplex) * rows*cols); 
+
+	cudaMemcpy(mat_tmp,mat,rows*cols*sizeof(cuDoubleComplex),cudaMemcpyDeviceToHost);
+
+	for (int i=0; i<cols; i++){
+		for (int j=0; j<rows; j++){
+			printf("%f+%fi ",cuCreal(mat_tmp[i*rows+j]),cuCimag(mat_tmp[i*rows+j]));
+		}	
+		printf("\n");
+	}
+
+	free(mat_tmp);
+}
+
 
 cudaError_t lanczos_diagnostic(dim3 blocks,
 		dim3 threads,
@@ -413,11 +435,12 @@ cudaError_t lanczos_diagnostic(dim3 blocks,
 	cuDoubleComplex * a_tmp = (cuDoubleComplex*) malloc(sizeof(cuDoubleComplex) * m); 
 	cuDoubleComplex * b_tmp = (cuDoubleComplex*) malloc(sizeof(cuDoubleComplex) * (m-1)); 
 
+	printf("-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n");
 	printf("Q: \n");
 	cudaMemcpy(Q_tmp,d_Q,(i+1)*m*sizeof(cuDoubleComplex),cudaMemcpyDeviceToHost);
 	for (int j=0; j<=i; j++){
 		for (int k=0; k<m; k++){
-			printf("%f+%f ",cuCreal(Q_tmp[j*m+k]),cuCimag(Q_tmp[j*m+k]));
+			printf("%f+%fi ",cuCreal(Q_tmp[j*m+k]),cuCimag(Q_tmp[j*m+k]));
 		}
 		printf("\n");
 	}
@@ -425,20 +448,20 @@ cudaError_t lanczos_diagnostic(dim3 blocks,
 	printf("r: \n");
 	cudaMemcpy(r_tmp,d_r,m*sizeof(cuDoubleComplex),cudaMemcpyDeviceToHost);
 	for (int k=0; k<m; k++)
-		printf("%f+%f ",cuCreal(r_tmp[k]),cuCimag(r_tmp[k]));
+		printf("%f+%fi ",cuCreal(r_tmp[k]),cuCimag(r_tmp[k]));
 	printf("\n");
 
 
 	printf("a: \n");
 	cudaMemcpy(a_tmp,d_alpha,m*sizeof(cuDoubleComplex),cudaMemcpyDeviceToHost);
 	for (int k=0; k<m; k++)
-		printf("%f+%f ",cuCreal(a_tmp[k]),cuCimag(a_tmp[k]));
+		printf("%f+%fi ",cuCreal(a_tmp[k]),cuCimag(a_tmp[k]));
 	printf("\n");
 	printf("b: \n");
 	cudaMemcpy(b_tmp,d_beta,(m-1)*sizeof(cuDoubleComplex),cudaMemcpyDeviceToHost);
 	for (int k=0; k<m-1; k++)
-		printf("%f+%f ",cuCreal(b_tmp[k]),cuCimag(b_tmp[k]));
-
+		printf("%f+%fi ",cuCreal(b_tmp[k]),cuCimag(b_tmp[k]));
+	printf("\n");
 
 
 	free(Q_tmp);
