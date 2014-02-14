@@ -23,6 +23,7 @@
 #include "utilities.h"
 
 __device__ __constant__ int cmem_size_kuck,cmem_size_MM_kuck;
+__device__ __constant__ int cmem_k;
 
 __device__ int delta_k(int k) {
 	return ( (k&0x01)==0 ? 1 : 0 );
@@ -103,7 +104,7 @@ __global__ void init_q(int k, float2 *q_temp) {
  * 
  * One block processes multiple complex matrices, performing more than one Givens rotation 
  * at a time.
- * One ensemble of threads processes one line of a matrix at a time.
+ -* One ensemble of threads processes one line of a matrix at a time.
  *
  * See 
  * - A.H. Sameh and D. J. Kuck, "On stable parallel linear system solvers"
@@ -111,30 +112,29 @@ __global__ void init_q(int k, float2 *q_temp) {
  *
  * PYT 07/26
  */
-__global__ void qr_gpu_kuck_bat(int k,float2 *matrices, float2 *q_temp,float2 *q_complete) {
+__global__ void qr_gpu_kuck_bat(float2 *matrices, float2 *q_complete) {
 
 	// Buffer rows
 	__shared__ float2 upper_row[NMPBL*MATRIX_SIDE];
 	__shared__ float2 lower_row[NMPBL*MATRIX_SIDE];
 
-	__shared__ float2 upper_Q[NMPBL*MATRIX_SIDE];
-	__shared__ float2 lower_Q[NMPBL*MATRIX_SIDE];
 	// index to matrix for processing
 	int myMatrix 		= threadIdx.x / MATRIX_SIDE;
 	// index to vector for processing
 	int vectorIndex 	= threadIdx.x % MATRIX_SIDE;
 	// matrix offset for this block
-	int memoryStride        = ( blockIdx.x * NMPBL + myMatrix  ) * MATRIX_SIDE * MATRIX_SIDE ;
+	unsigned int memoryStride        = ( blockIdx.x * NMPBL + myMatrix  ) * MATRIX_SIDE * MATRIX_SIDE ;
 
 	// Set column and line number we want to eliminate
 	int my_i, my_j = 0;
-	int dk = delta_k(k);
-	if( k < MATRIX_SIDE ) {
+
+	int dk = delta_k(cmem_k);
+	if( cmem_k < MATRIX_SIDE ) {
 		my_j = blockIdx.z;
-		my_i = (MATRIX_SIDE-k) + 2*my_j;
+		my_i = (MATRIX_SIDE-cmem_k) + 2*my_j;
 	} else {
-		my_j = (k-MATRIX_SIDE) + blockIdx.z + 1;
-		my_i = (k-MATRIX_SIDE) + 2*blockIdx.z + 2;
+		my_j = (cmem_k-MATRIX_SIDE) + blockIdx.z + 1;
+		my_i = (cmem_k-MATRIX_SIDE) + 2*blockIdx.z + 2;
 	}	
 
 	// Load row data
@@ -142,11 +142,11 @@ __global__ void qr_gpu_kuck_bat(int k,float2 *matrices, float2 *q_temp,float2 *q
 		upper_row[threadIdx.x] = matrices[memoryStride + (my_i-1)*MATRIX_SIDE + vectorIndex]; // Upper row
 		lower_row[threadIdx.x] = matrices[memoryStride + my_i*MATRIX_SIDE + vectorIndex]; // Lower row w/ leading zero
 	}	
-
 	// Calculate c and s
 	float2 u,v,c,s;
 	float f,g,den;
 
+	// Sync: Wait for all the data to be loaded first
 	__syncthreads();
 	u = upper_row[myMatrix*MATRIX_SIDE + my_j]; // broadcast operation from SMEM
 	v = lower_row[myMatrix*MATRIX_SIDE + my_j]; // broadcast operation from SMEM
@@ -187,7 +187,7 @@ __global__ void qr_gpu_kuck_bat(int k,float2 *matrices, float2 *q_temp,float2 *q
 	//// Compute the two rows update
 	// u*c + v*s
 	// Load data 
-	__syncthreads();
+//	__syncthreads();
 	u = upper_row[threadIdx.x];
 	v = lower_row[threadIdx.x];
 	// Perform product: real part 
@@ -205,7 +205,7 @@ __global__ void qr_gpu_kuck_bat(int k,float2 *matrices, float2 *q_temp,float2 *q
 	// Perform product: imaginary part
 	g = (u.x*s.y - u.y*s.x) + (v.x*c.y + v.y*c.x);
 
-	// Store
+	// Store: sync is necessary to avoid overwriting data for warps that are still getting data from broadcast
 	__syncthreads();
 	upper_row[threadIdx.x] = tmp;
 
@@ -220,34 +220,36 @@ __global__ void qr_gpu_kuck_bat(int k,float2 *matrices, float2 *q_temp,float2 *q
 		matrices[memoryStride + my_i * MATRIX_SIDE + vectorIndex ].y     = (vectorIndex > my_j) * lower_row[threadIdx.x].y;
 	}
 
-	// Write to q_temp
-	/*
-	__syncthreads();
-	int mask = (vectorIndex == my_i || vectorIndex == (my_i-1));
-	upper_row[threadIdx.x].x = mask*( (vectorIndex == (my_i-1))*c.x + (vectorIndex == (my_i))*s.x );
-	upper_row[threadIdx.x].y = mask*( (vectorIndex == (my_i-1))*c.y + (vectorIndex == (my_i))*s.y );
+	// Get data from Q
+	if(memoryStride + my_i*MATRIX_SIDE + vectorIndex < cmem_size_kuck*MATRIX_SIDE*MATRIX_SIDE) {
+		upper_row[threadIdx.x] = q_complete[memoryStride + (my_i-1) * MATRIX_SIDE + vectorIndex ]; 	
+		lower_row[threadIdx.x] = q_complete[memoryStride + my_i * MATRIX_SIDE + vectorIndex ];
+	}
 
-	lower_row[threadIdx.x].x = mask*( (vectorIndex == -(my_i-1))*s.x + (vectorIndex == (my_i))*c.x );
-	lower_row[threadIdx.x].y = mask*( (vectorIndex == (my_i-1))*s.y + (vectorIndex == (my_i))*c.y );
-*/
-	// Load from q_complete: two rows are only necessary	
-	__syncthreads();
-	upper_Q[threadIdx.x] = q_complete[memoryStride + (my_i-1) * MATRIX_SIDE + vectorIndex ]; 	
-	lower_Q[threadIdx.x] = q_complete[memoryStride + my_i * MATRIX_SIDE + vectorIndex ];
-
-	// Perform the multiplication: QCOMPLETE = QTEMP * QCOMPLETE
-	u = upper_Q[threadIdx.x]; 
-	v = lower_Q[threadIdx.x];
+	// Perform the multiplication
+	u = upper_row[threadIdx.x]; 
+	v = lower_row[threadIdx.x];
 
 	// Q[i-1,k] = C*Q[i-1,k] + S*Q[i,k]
-	upper_row[threadIdx.x].x = (u.x*c.x - u.y*c.y) + (v.x*s.x - v.y*s.y); 
-	upper_row[threadIdx.x].y = (u.x*c.y + u.y*c.x) + (v.x*s.y + v.y*s.x);
+	// Perform product: real part 
+	f = (u.x*c.x - u.y*c.y) + (v.x*s.x - v.y*s.y); 
+	// Perform product: imaginary part
+	g = (u.x*c.y + u.y*c.x) + (v.x*s.y + v.y*s.x);
+
+	tmp.x = f;
+	tmp.y = g;
 
 	// Q[i,k] = -S'*Q[i-1,k] + C*Q[i,k]
-	lower_row[threadIdx.x].x = -(u.x*s.x + u.y*s.y) + (v.x*c.x - v.y*c.y); 
-	lower_row[threadIdx.x].y =  (u.x*s.y - u.y*s.x) + (v.x*c.y + v.y*c.x);
+	// Perform product: real part 
+	f = -(u.x*s.x + u.y*s.y) + (v.x*c.x - v.y*c.y); 
+	// Perform product: imaginary part
+	g = (u.x*s.y - u.y*s.x) + (v.x*c.y + v.y*c.x);
 
-	__syncthreads();
+	upper_row[threadIdx.x] = tmp;
+
+	lower_row[threadIdx.x].x = f;
+	lower_row[threadIdx.x].y = g;
+
 	// Write to global
 	if(memoryStride + my_i*MATRIX_SIDE + vectorIndex < cmem_size_kuck*MATRIX_SIDE*MATRIX_SIDE) {
 		q_complete[memoryStride + (my_i-1) * MATRIX_SIDE + vectorIndex ] 	= upper_row[threadIdx.x];
@@ -260,7 +262,7 @@ __global__ void qr_gpu_kuck_bat(int k,float2 *matrices, float2 *q_temp,float2 *q
 extern "C"{
 	void givens_qr_kuck_bat(float * mats, int size, float * q){
 
-		float2 *q_tempA,*q_tempB,*q_complete,*matrices;
+		float2 *q_complete,*matrices;
 
 		//initialize Q
 		for (int k=0; k<size; k++)
@@ -274,11 +276,8 @@ extern "C"{
 
 		// Allocate memory and copy data
 		cudaMalloc((void**) &q_complete, sizeof(float2)*size*MATRIX_SIDE*MATRIX_SIDE);
-		cudaMalloc((void**) &q_tempA, sizeof(float2)*size*MATRIX_SIDE*MATRIX_SIDE);
-		cudaMalloc((void**) &q_tempB, sizeof(float2)*size*MATRIX_SIDE*MATRIX_SIDE);
 
 		cudaMemcpy(q_complete, q, sizeof(float2)*MATRIX_SIDE*MATRIX_SIDE*size, cudaMemcpyHostToDevice);
-		cudaMemcpy(q_tempA, q, sizeof(float2)*MATRIX_SIDE*MATRIX_SIDE*size, cudaMemcpyHostToDevice);
 
 		cudaMalloc((void**) &matrices, sizeof(float2)*size*MATRIX_SIDE*MATRIX_SIDE);
 		cudaMemcpy(matrices, mats, sizeof(float2)*MATRIX_SIDE*MATRIX_SIDE*size, cudaMemcpyHostToDevice);
@@ -295,6 +294,10 @@ extern "C"{
 		grid_copy2tmp.x = dim1d_copy2tmp;
 		grid_copy2tmp.y = dim1d_copy2tmp;
 
+		
+		cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+//		cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+
 		double begin = omp_get_wtime();	
 		for(int k = 1;k<=2*MATRIX_SIDE-3;k++) {
 
@@ -304,13 +307,16 @@ extern "C"{
 				blocks.z = (int)ceil((float)k/2.0f) - k + MATRIX_SIDE-1;
 			}	
 
+			cudaMemcpyToSymbol(cmem_k,&k,sizeof(k));
 			// Launch the main kernel; calculates the Givens rotations and places them in the temporary matrix Q_A
-			qr_gpu_kuck_bat <<< blocks,NTH >>> (k,matrices,q_tempA,q_complete); 
+			qr_gpu_kuck_bat <<< blocks,NTH >>> (matrices,q_complete); 
 			#ifdef GPU_DEBUG
 			checkCUDAError("QR_GPU_BAT FAILED",__FILE__,__LINE__-1);
 			#endif
-		}//end main loops
+	}//end main loops
 
+	cudaDeviceSynchronize();
+	double end = omp_get_wtime();
 
 
 	#ifdef _QR_VERBOSE_
@@ -324,8 +330,8 @@ extern "C"{
 		// Take the transpose of q_complete is CUBLAS
 		for (int k=0; k<size; k++){
 			printf("q %i\n",k);
-			for (int j=0; j<MATRIX_SIDE; j++) {
-				for (int i=0; i<MATRIX_SIDE; i++){
+			for (int i=0; i<MATRIX_SIDE; i++) {
+				for (int j=0; j<MATRIX_SIDE; j++){
 					printf("%f+%fi, ",q_dump[j+MATRIX_SIDE*i+k*MATRIX_SIDE*MATRIX_SIDE].x,
 							q_dump[j+MATRIX_SIDE*i+k*MATRIX_SIDE*MATRIX_SIDE].y);
 			
@@ -342,7 +348,7 @@ extern "C"{
 							r_dump[j+MATRIX_SIDE*i+k*MATRIX_SIDE*MATRIX_SIDE].y);
 
 
-				printf(";\n",i);
+				printf(";\n");
 			}
 
 		}
@@ -352,13 +358,8 @@ extern "C"{
 		free(q_dump);
 
 	#endif
+	printf("QR KUCK-SAMEH\t %f\n",end-begin);
 
-		cudaDeviceSynchronize();
-		double end = omp_get_wtime();
-		printf("QR KUCK-SAMEH\t %f\n",end-begin);
-
-		cudaFree(q_tempA);
-		cudaFree(q_tempB);
 		cudaFree(q_complete);
 		cudaFree(matrices);
 	}

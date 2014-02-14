@@ -25,9 +25,9 @@
 
 //#define NUM_MATRICES		1
 //#define STREAMS			8
-#define MATRIX_SIDE	32	
+#define MATRIX_SIDE 64 
 #define _MAX_SIZE 1024
-#define NMPBL	32	
+#define NMPBL 16	
 #define NTH 1024 
 
 #define global_row_i	memoryStride + i*MATRIX_SIDE + vectorIndex

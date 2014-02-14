@@ -3,14 +3,22 @@ SOURCES     := $(sort $(wildcard src/*.cpp src/*.cu src/*.cc src/*.c))
 OBJECTS     := $(sort $(patsubst src/%, obj/%.o, $(SOURCES)))
 DEPENDS     := $(sort $(patsubst src/%, obj/%.d, $(SOURCES)))
 
-CFLAGS      += -std=gnu99 -I./inc -I/usr/global/cuda/5.0/include -openmp -I/usr/global/intel/mkl/2011.4/include
-LDFLAGS     += -L/usr/global/cuda/5.0/lib64 -lcudart -lcuda -lcublas 
-LDFLAGS     += -L/usr/global/intel/mkl/2011.4/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lpthread -openmp 
-CUFLAGS     += -arch=sm_20 -I./inc 
+MKL=/usr/global/intel/mkl/11.0.0.079
+MKL_LIB=$(MKL)/lib/intel64 -lmkl_rt
+MKL_INC=$(MKL)/include
+
+CUDA=/usr/global/cuda/5.5
+CUDA_LIB=$(CUDA)/lib64
+CUDA_INC=$(CUDA)/include
+
+CFLAGS      += -std=gnu99 -I./inc -I$(CUDA_INC) -openmp -I$(MKL_INC)
+LDFLAGS     += -L$(CUDA_LIB) -lcudart -lcuda -lcublas 
+LDFLAGS     += -L$(MKL_LIB) -openmp 
+CUFLAGS     += -gencode arch=compute_35,code=sm_35 -I./inc 
 CUFLAGS     += --ptxas-options=-v 
 
-NVCC        := nvcc -O3
-CXX         := icc -O3 -xHost
+NVCC        := nvcc -O3  #-D_QR_VERBOSE_
+CXX         := icc -g -O3  -xHost #-D_QR_VERBOSE_
 
 bin/qr.x: $(OBJECTS)
 	$(CXX) -o $@ $^ $(LDFLAGS)
