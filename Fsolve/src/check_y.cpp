@@ -22,7 +22,7 @@
 
 using namespace std;
 
-void check_y(vector<map<float,float> >& y_complete){
+void check_y(vector<map<float,float> >& y_complete, vector<float> &iv){
 
 
 	map<float,float> indices;

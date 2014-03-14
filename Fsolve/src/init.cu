@@ -36,7 +36,7 @@ void init_f(vector<float> &k_inds, 			//as before
 	float ** function_dev,				//storage for f(y)
 	float ** delta,					//storage for delta
 	float ** y_dev,					//solution vector
-	float guess){					//init guess
+	vector<float>& iv){					//init guess
 
 
 	int num_leaves 	= constants.size();
@@ -104,7 +104,7 @@ void init_f(vector<float> &k_inds, 			//as before
 	//init y
 	srand(time(NULL));
 	for (int i=0; i<num_funcs; i++)
-		tmp_y[i] = guess * rand() / (float) RAND_MAX;
+		tmp_y[i] = iv[i]; //guess * rand() / (float) RAND_MAX;
 
 	cudaMalloc(y_dev, sizeof(float)*num_funcs);
 	//cout << "ydev 2 " << *y_dev << endl;
