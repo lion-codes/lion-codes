@@ -6,11 +6,11 @@ DEPENDS     := $(sort $(patsubst src/%, obj/%.d, $(SOURCES)))
 CPPFLAGS      += -I./inc -I/usr/global/cuda/5.0/include -I/usr/global/boost/1.50.0/boost
 LDFLAGS     += -L/usr/global/cuda/5.0/lib64 -lcudart -lcuda -lcusparse
 LDFLAGS     += -L/usr/global/boost/1.50.0/libs/
-CUFLAGS     += -arch=sm_20 -I./inc 
+CUFLAGS     += -arch=sm_30 -I./inc 
 CUFLAGS     += --ptxas-options=-v 
 
-NVCC        := nvcc -g -G
-CXX         := g++ -g
+NVCC        := nvcc -O3 -U__VERBOSE 
+CXX         := g++ -O3 -U__VERBOSE
 
 bin/fsolve.x: $(OBJECTS)
 	$(CXX) -o $@ $^ $(LDFLAGS)

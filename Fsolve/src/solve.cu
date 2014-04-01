@@ -23,6 +23,7 @@
 
 
 #include <thrust/device_ptr.h>
+#include <thrust/fill.h>
 #include <vector>
 #include "main.h"
 #include "checks.cuh"
@@ -56,7 +57,7 @@ __global__ void eval_f(eval_node * f_nodes_dev,
 		if (node.y_index_2 != -1)
 			fnt		*= powf(tex1Dfetch(y_tex, node.y_index_2-1),node.y_exp_2);	
 
-		//printf("b : %i t: %i c: %f k: %i y1: %i e1: %f y2: %i e2: %f fnt : %f tr : %f y: %f\n",\
+	//	printf("b : %i t: %i c: %f k: %i y1: %i e1: %f y2: %i e2: %f fnt : %f tr : %f y: %f\n",\
 		blockIdx.x,threadIdx.x,node.constant,node.k_index,node.y_index_1,node.y_exp_1,node.y_index_2,\
 			node.y_exp_2, fnt, tex1Dfetch(k_tex,node.k_index-1), tex1Dfetch(y_tex, node.y_index_1-1));
 
@@ -134,9 +135,9 @@ __global__ void evalj(eval_node * j_nodes_dev,
 		if (node.y_index_2 != -1)
 			fnt		*= powf(tex1Dfetch(y_tex, node.y_index_2-1),node.y_exp_2);	
 
-		//if (blockIdx.x==0) printf("b : %i t: %i c: %f k: %i y1: %i e1: %f y2: %i e2: %f fnt : %f tr : %f y: %f\n",\
-		blockIdx.x,threadIdx.x,node.constant,node.k_index,node.y_index_1,node.y_exp_1,node.y_index_2,\
-			node.y_exp_2, fnt, tex1Dfetch(k_tex,node.k_index-1), tex1Dfetch(y_tex, node.y_index_1-1));
+	//	printf("b : %i t: %i c: %f k: %i y1: %i e1: %f y2: %i e2: %f fnt : %f tr : %f y: %f\n",\
+	//	blockIdx.x,threadIdx.x,node.constant,node.k_index,node.y_index_1,node.y_exp_1,node.y_index_2,\
+	//		node.y_exp_2, fnt, tex1Dfetch(k_tex,node.k_index-1), tex1Dfetch(y_tex, node.y_index_1-1));
 
 	}
 
@@ -241,6 +242,8 @@ int solve(vector<int>& index_i, 	//index i
 		float * y_dev,			//solution on device
 		float * output){	
 
+	//	print_all<<<1,1>>>(y_dev);
+	//	cudaThreadSynchronize();
 
 	//scale for updates
 	float scale = 10.0f;
@@ -252,6 +255,12 @@ int solve(vector<int>& index_i, 	//index i
 	for (int i=0; i<size_k; i++){
 		tmp_k[i] = k_data[i];
 	}
+
+	// Fill y with 1's
+//	thrust::device_ptr<float> d_ptr = thrust::device_pointer_cast(y_dev);
+//	thrust::fill(d_ptr,d_ptr + f_size, 1);
+
+
 
 	float *kArray = NULL;
 	cudaMalloc((void**) &kArray, sizeof(float)*size_k);
@@ -312,6 +321,12 @@ int solve(vector<int>& index_i, 	//index i
 			terms_jac_dev, 
 			jacobian_dev, 
 			offset_terms_jac_dev);			
+	cudaCheckError("eval_j");
+
+
+	std::cout << "Jacobian values" << endl;
+	thrust::copy_n(jp,j_size,J.values.begin());
+	cusp::print(J);
 
 
 	//copy back initial J and see how we're doing
@@ -321,7 +336,7 @@ int solve(vector<int>& index_i, 	//index i
 
 	float val = 0.0f;
 	int index = 0;
-	for (int i=0; i<index_i.size(); i++){
+/*	for (int i=0; i<index_i.size(); i++){
 
 		if (index_i[i] > index){
 			index++;
@@ -341,7 +356,7 @@ int solve(vector<int>& index_i, 	//index i
 		}
 
 	}
-
+*/
 	delete[] test_J;
 	//	calculate an initial f
 
@@ -361,11 +376,9 @@ int solve(vector<int>& index_i, 	//index i
 
 	//Newton-Raphson iterations
 	for (int i=0; i<MAX_ITERATIONS; i++){
-
-		//cusp::print(J);
+//	for (int i=0; i<1; i++){
 
 		//update f
-
 		eval_f<<<blocks_f,threads_f>>>(f_nodes_dev, 
 				terms_dev, 
 				function_dev, 
@@ -376,6 +389,8 @@ int solve(vector<int>& index_i, 	//index i
 
 		thrust::copy_n(fp, f_size, f.begin());
 
+
+
 #ifdef __VERBOSE
 		cusp::verbose_monitor<float> monitor(f, 5000, 1e-8);
 #else
@@ -383,6 +398,7 @@ int solve(vector<int>& index_i, 	//index i
 #endif
 		// solve the linear system J * d = -f 
 		cudaThreadSynchronize();	
+
 		cusp::krylov::gmres(J, d, f,500,monitor); 
 
 		cudaThreadSynchronize();	
@@ -443,8 +459,6 @@ int solve(vector<int>& index_i, 	//index i
 		cudaThreadSynchronize();	
 		cudaCheckError("eval_j");
 		thrust::copy_n(jp, j_size, J.values.begin());
-
-
 	}
 
 

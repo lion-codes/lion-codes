@@ -26,6 +26,12 @@
 
 using namespace std;
 
+__global__ void print_Y(float *Y) {
+	for(int i = 0;i<179;i++)
+		printf("Y[%d] = %e\n",i,Y[i]);
+
+}		
+
 void init_f(vector<float> &k_inds, 			//as before
 	vector<float>& constants, 			//
 	vector<map<float,float> >& y_complete, 		//
@@ -102,9 +108,11 @@ void init_f(vector<float> &k_inds, 			//as before
 
 	//cout << num_funcs << endl;
 	//init y
-	srand(time(NULL));
+//	srand(time(NULL));
+	srand(1024);
 	for (int i=0; i<num_funcs; i++)
 		tmp_y[i] = guess * rand() / (float) RAND_MAX;
+
 
 	cudaMalloc(y_dev, sizeof(float)*num_funcs);
 	//cout << "ydev 2 " << *y_dev << endl;

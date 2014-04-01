@@ -30,7 +30,7 @@
 #define __MAIN_H
 
 #define SHARED_BUF_SIZE 256
-#define MAX_ITERATIONS 100
+#define MAX_ITERATIONS 1000
 #define THREADS_UP 512
 #define THREADS_L2 512
 #define fpe(x) (isnan(x) || isinf(x))

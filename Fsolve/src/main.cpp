@@ -153,7 +153,7 @@ int main(int argc, char * argv[])
 
 	cout << "Output Solution:" << endl;
 	for (int i=0; i<terms.size(); i++)
-		cout << output[i] << " ";
+		cout << output[i] << " " << endl;
 
 	cout << endl;
 
