@@ -25,6 +25,7 @@
 #include <map>
 #include <assert.h>
 #include <cuda.h>
+#include <cfloat>
 
 #ifndef __MAIN_H
 #define __MAIN_H
@@ -40,7 +41,9 @@
 
 
 using namespace std;
-void parser_main(char * filename, 			//csv file with k data
+void parser_main(char * filenameA, 			//csv file with k data
+	char * filenameB,				//init values filename
+	vector<float>& iv,				//intial values
 	vector<float>& k_data,				//k data itself
 	vector<float>& k_inds, 				//the k indices for equations
 	vector<float>& constants, 			//all constant/sign data
@@ -84,7 +87,7 @@ void init_f(vector<float> &k_inds, 			//as before
 	float ** function_dev,				//storage for f(y)
 	float ** delta,					//storage for delta
 	float ** y_dev,					//storage for y, solution
-	float guess);
+	vector<float>& iv);				//initial values
 
 void init_j(vector<float> &k_inds_jac, 			//as before
 	vector<float>& constants_jac, 			//
@@ -116,6 +119,6 @@ int solve(vector<int>& index_i, 			//i indices in COO rep
 	float * output);
 
 
-void check_y(vector<map<float,float> >& y_complete);	//do just that
+void check_y(vector<map<float,float> >& y_complete, vector<float>& iv);	//do just that
 
 #endif

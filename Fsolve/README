@@ -1,6 +1,6 @@
 A non-linear solver for y in equation system F(k,y) = 0. After building, one may run thusly : 
 
-USAGE : fsolve.x <tolerance> <file with constant k data, comma separated> <soln. guess> & equations supplied on stdin
+USAGE : fsolve.x <tolerance> <file with constant k data, comma separated> <soln. guess OR filename with initial values> & equations supplied on stdin
 
 eg.,
 

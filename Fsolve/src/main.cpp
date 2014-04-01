@@ -28,13 +28,13 @@ int main(int argc, char * argv[])
 {
 
 
-	if (argc < 4){
-		cerr << "USAGE : fsolve.x <tolerance> <file with k data, comma separated> <soln. guess> & equations supplied on stdin" << endl;
+	if (argc < 3){
+		cerr << "USAGE : fsolve.x <tolerance> <file with k data, comma separated> <soln. guess OR a file with initial values> & equations supplied on stdin" << endl;
 		throw std::invalid_argument( "Received bad equation format on stdin" );
 	}
 
 	//all the data we read in, for function evaluation
-	vector<float> k, k_inds, constants;
+	vector<float> k, iv, k_inds, constants;
 	vector<map<float,float> > y_complete;	
 
 	//how many terms per equation
@@ -49,9 +49,12 @@ int main(int argc, char * argv[])
 	float tol = atof(argv[1]);
 	float guess = atof(argv[3]);
 	
-	
+	iv.push_back(FLT_MIN);
+
 
 	parser_main(argv[2], 
+		argv[3],
+		iv,
 		k, 
 		k_inds, 
 		constants, 
@@ -60,11 +63,16 @@ int main(int argc, char * argv[])
 		max_term_f, 
 		max_term_size);
 
-	cerr << "max_term & max_term_size" << endl;
-	cerr << max_term_f << " " << max_term_size << endl;
+	
+	if (iv[0]==FLT_MIN){
+		iv[0] = guess*rand() / (float) RAND_MAX;
+		for (int i=1; i<y_complete.size(); i++)
+			iv.push_back(guess * rand() / (float) RAND_MAX);
+	}
+
 
 	//check and maybe relabel y-indices
-	check_y(y_complete);
+	check_y(y_complete,iv);
 
 	//we're only using ~ float6's for now ie., max of two y variables per term
 	assert(max_term_size <= 2);
@@ -116,7 +124,7 @@ int main(int argc, char * argv[])
 		&function_dev, 
 		&delta,
 		&y_dev,
-		guess);
+		iv);
 	
 	//ready the device for jacobian eval	
 	init_j(k_inds_jac, 

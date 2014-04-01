@@ -21,16 +21,18 @@
 
 using namespace clientp;
 
-void parser_main(char * filename, 			//csv file with k data
+void parser_main(char * filenameA, 			//csv file with k data
+		char * filenameB,			//init values file
+		vector<float>& iv,			// init vales
 		vector<float>& k,				//k data
-		vector<float>& k_inds, 				//the k idices for equations
+		vector<float>& k_inds, 				//the k indices for equations
 		vector<float>& constants, 			//all constant/sign data
 		vector<map<float,float> >& y_complete, 		//all y data (yindex(key) & power(value))
 		vector<int>& terms, 				//the number of terms per function evaluation
 		int& max_elements,				//the maximum number of terms in equation evaluation
 		int& max_term_size){				//maximum elements encountered in equation term, for node size
 
-	ifstream ifile(filename);
+	ifstream ifile(filenameA);
 	string value;
 	bool success=false;
 
@@ -39,11 +41,26 @@ void parser_main(char * filename, 			//csv file with k data
 	}
 
 	ifile.close();
-
 	// abort;
 	if (!success)
 		throw std::invalid_argument( "loading of k data failed" );
 
+	//initial values
+	ifstream ivfile(filenameB);
+	if (ivfile.good()){
+		success=false;
+
+		while(getline(ivfile,value)){
+			success |= clientp::parse_csv(value.begin(), value.end(), iv);
+		}
+
+		ivfile.close();
+
+		// abort;
+		if (!success)
+			throw std::invalid_argument( "loading of inital value data failed" );
+
+	}
 
 
 	//buffer for equations arriving on stdin & line num

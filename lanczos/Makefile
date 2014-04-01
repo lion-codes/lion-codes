@@ -3,9 +3,10 @@ SOURCES     := $(sort $(wildcard src/*.cpp src/*.cu src/*.cc src/*.c))
 OBJECTS     := $(sort $(patsubst src/%, obj/%.o, $(SOURCES)))
 DEPENDS     := $(sort $(patsubst src/%, obj/%.d, $(SOURCES)))
 
-CFLAGS      += -std=gnu99 -I./inc -I/usr/global/cuda/5.0/include -I/usr/global/openmpi/022513/gnu/include
-LDFLAGS     += -L/usr/global/cuda/5.0/lib64 -lcudart -lcuda -lcublas -lmpi -L/usr/global/openmpi/022513/gnu/lib
-LDFLAGS     += -L/usr/global/intel/mkl/2011.4/lib/intel64 -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lmkl_sequential -lm -fopenmp
+CFLAGS      += -std=gnu99 -I./inc -I/usr/global/cuda/5.0/include 
+#LDFLAGS     += -L/usr/global/cuda/5.0/lib64 
+LDFLAGS	    += -L/usr/local/cuda-5.5/lib64 -lcudart -lcuda -lcublas -lmpi 
+LDFLAGS     += -L/usr/global/intel/mkl/11.0.0.079/lib/intel64/ -lmkl_rt -lm -fopenmp
 CUFLAGS     += -arch=sm_20 -I./inc -I/usr/global/openmpi/022513/gnu/lib
 CUFLAGS     += --ptxas-options=-v
 

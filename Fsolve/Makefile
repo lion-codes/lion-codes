@@ -3,8 +3,8 @@ SOURCES     := $(sort $(wildcard src/*.cpp src/*.cu src/*.cc src/*.c))
 OBJECTS     := $(sort $(patsubst src/%, obj/%.o, $(SOURCES)))
 DEPENDS     := $(sort $(patsubst src/%, obj/%.d, $(SOURCES)))
 
-CPPFLAGS      += -I./inc -I/usr/global/cuda/5.0/include -I/usr/global/boost/1.50.0/boost
-LDFLAGS     += -L/usr/global/cuda/5.0/lib64 -lcudart -lcuda -lcusparse
+CPPFLAGS      += -I./inc -I/usr/local/cuda-5.5/include -I/gpfs/apps/cuda-rhel6/cuda/5.0/include/ -I/usr/global/boost/1.50.0/boost
+LDFLAGS     += -L/usr/local/cuda-5.5/lib64 -lcudart -lcuda -lcusparse
 LDFLAGS     += -L/usr/global/boost/1.50.0/libs/
 CUFLAGS     += -arch=sm_30 -I./inc 
 CUFLAGS     += --ptxas-options=-v 

@@ -26,8 +26,11 @@
 
 #define _DEBUG_LANCZOS
 #define _MAX_SIZE 1024*1024
-#define _USE_GPU
+//#define _USE_GPU
 #define _CALC_EVECS
+
+//#define _GATHER_SCALAR
+
 
 #ifdef _USE_GPU
 #include <cuda.h>
@@ -37,20 +40,41 @@
 #include <cuComplex.h>
 
 
-
 #endif
 
-
-// threads for lanczos update kernels
-#define _LAN_THREADS 32
+#define _LAN_THREADS 16
 
 // tolerance in dot products of subsequent e-vectors 
 // ie., if norm is greater than this, orthogonalize
-#define _EVECS_NORM 0.01
+#define _EVECS_NORM 0.00001
 
+
+#ifdef _DEBUG_LANCZOS
+#define check_cu_error(x) 	check_last_cuda_error(cerror,x,hostname,__LINE__);
+#define	check_cb_error(x)	check_last_cublas_error(status,x,hostname,__LINE__);
+#else
+#define check_cu_error(x) 	
+#define	check_cb_error(x)	
+#endif
 
 
 // blas& lapack defs
+
+void zsteqr_(char * type,//you know
+	int * n,		//mat order	
+	double * D,		//diagonal
+	double * E,		//off-diag
+	complex double * evectors,
+	int * m,
+	double * scratch,	
+	int * info);
+
+
+void dsterf_(int * n, //matrix order
+		double * D, 	//diagonal
+		double * E, 	//off-diag 
+		int * INFO );	//information, of sorts
+
 
 void zgemv_(char * type,	// transpose or not etc
 		int * rows,		// mat rows
@@ -108,7 +132,8 @@ cudaError_t lanczos_second_update(dim3 blocks,
 		cuDoubleComplex * d_Q, 
 		cuDoubleComplex * d_beta, 
 		int m,
-		int i);
+		int i,
+		int j);
 
 cudaError_t lanczos_third_update(dim3 blocks,
 		dim3 threads,
