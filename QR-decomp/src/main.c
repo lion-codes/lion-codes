@@ -69,7 +69,7 @@ int main(int argc, char * argv[] ){
 	printf("GPU routine\n");
 	printf("***********\n");
 #endif
-//	givens_qr_kuck_bat(A,batSize,q);
+	givens_qr_kuck_bat(A,batSize,q);
 
 
 	/****************
@@ -80,7 +80,7 @@ int main(int argc, char * argv[] ){
 	printf("CPU routine\n");
 	printf("***********\n");
 #endif
- 	givens_qr_cpu(A,batSize,q);
+// 	givens_qr_cpu(A,batSize,q);
 
 
 	/****************
